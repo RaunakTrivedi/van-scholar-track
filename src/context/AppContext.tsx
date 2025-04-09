@@ -28,6 +28,7 @@ export interface Van {
   name: string;
   capacity: number;
   route: string;
+  defaultFee?: number; // New field for default fee
 }
 
 interface AppContextType {
@@ -41,16 +42,19 @@ interface AppContextType {
   updateFeeStatus: (feeId: string, status: "paid" | "unpaid", paidDate?: string) => void;
   updateFeeAmount: (feeId: string, amount: number) => void;
   updateVan: (vanId: string, vanData: Partial<Van>) => void;
+  addVan: (vanData: Omit<Van, "id">) => void; // New function to add van
+  removeVan: (vanId: string) => void; // New function to remove van
+  updateVanFeeForAllStudents: (vanId: string, feeAmount: number) => void; // New function
 }
 
 // Mock data
 const initialVans: Van[] = [
-  { id: "1", name: "Van A", capacity: 15, route: "North Route" },
-  { id: "2", name: "Van B", capacity: 12, route: "South Route" },
-  { id: "3", name: "Van C", capacity: 15, route: "East Route" },
-  { id: "4", name: "Van D", capacity: 12, route: "West Route" },
-  { id: "5", name: "Van E", capacity: 15, route: "Central Route" },
-  { id: "6", name: "Van F", capacity: 12, route: "Highway Route" },
+  { id: "1", name: "Van A", capacity: 15, route: "North Route", defaultFee: 1500 },
+  { id: "2", name: "Van B", capacity: 12, route: "South Route", defaultFee: 1500 },
+  { id: "3", name: "Van C", capacity: 15, route: "East Route", defaultFee: 1500 },
+  { id: "4", name: "Van D", capacity: 12, route: "West Route", defaultFee: 1500 },
+  { id: "5", name: "Van E", capacity: 15, route: "Central Route", defaultFee: 1500 },
+  { id: "6", name: "Van F", capacity: 12, route: "Highway Route", defaultFee: 1500 },
 ];
 
 const initialStudents: Student[] = [
@@ -75,6 +79,9 @@ const generateFeeRecords = (): FeeRecord[] => {
   const currentYear = new Date().getFullYear();
   
   initialStudents.forEach(student => {
+    const van = initialVans.find(v => v.id === student.vanId);
+    const feeAmount = student.customFeeAmount || van?.defaultFee || 1500;
+    
     months.forEach((month, index) => {
       // Randomly set some as paid and some as unpaid
       const isPaid = Math.random() > 0.3;
@@ -83,7 +90,7 @@ const generateFeeRecords = (): FeeRecord[] => {
         studentId: student.id,
         month,
         year: currentYear,
-        amount: 1500,
+        amount: feeAmount,
         status: isPaid ? "paid" : "unpaid",
         paidDate: isPaid ? new Date(currentYear, index, Math.floor(Math.random() * 28) + 1).toISOString() : undefined
       });
@@ -115,12 +122,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const months = ["January", "February", "March", "April", "May", "June"];
     const currentYear = new Date().getFullYear();
     
+    const van = vans.find(v => v.id === studentData.vanId);
+    const feeAmount = studentData.customFeeAmount || van?.defaultFee || 1500;
+    
     const newFeeRecords = months.map((month, index) => ({
       id: `${newStudent.id}-${month}`,
       studentId: newStudent.id,
       month,
       year: currentYear,
-      amount: 1500, // Default amount, can be customized later
+      amount: feeAmount,
       status: "unpaid" as const
     }));
     
@@ -168,6 +178,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       )
     );
   };
+  
+  // New function to add a van
+  const addVan = (vanData: Omit<Van, "id">) => {
+    const newVan: Van = {
+      ...vanData,
+      id: `${vans.length + 1}`,
+    };
+    setVans([...vans, newVan]);
+  };
+  
+  // New function to remove a van
+  const removeVan = (vanId: string) => {
+    // First check if there are students assigned to this van
+    const studentsInVan = students.filter(student => student.vanId === vanId);
+    
+    if (studentsInVan.length > 0) {
+      throw new Error("Cannot remove a van with assigned students");
+    }
+    
+    setVans(prevVans => prevVans.filter(van => van.id !== vanId));
+  };
+  
+  // New function to update fee for all students in a van
+  const updateVanFeeForAllStudents = (vanId: string, feeAmount: number) => {
+    const studentsInVan = getStudentsByVan(vanId);
+    const currentDate = new Date();
+    const currentMonthName = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ][currentDate.getMonth()];
+    const currentYear = currentDate.getFullYear();
+    
+    // Update the default fee for the van
+    updateVan(vanId, { defaultFee: feeAmount });
+    
+    // Update current month's fee records for all students in the van who don't have custom fee
+    setFeeRecords(prevRecords => 
+      prevRecords.map(record => {
+        const student = studentsInVan.find(s => s.id === record.studentId);
+        // Only update if student is in this van, it's current month, and student has no custom fee
+        if (student && 
+            !student.customFeeAmount && 
+            record.month === currentMonthName && 
+            record.year === currentYear) {
+          return { ...record, amount: feeAmount };
+        }
+        return record;
+      })
+    );
+  };
 
   const value = {
     vans,
@@ -179,7 +239,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     getFeeRecordsByStudent,
     updateFeeStatus,
     updateFeeAmount,
-    updateVan
+    updateVan,
+    addVan,
+    removeVan,
+    updateVanFeeForAllStudents
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
