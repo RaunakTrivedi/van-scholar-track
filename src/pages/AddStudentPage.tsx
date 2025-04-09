@@ -29,15 +29,17 @@ const AddStudentPage: React.FC = () => {
   const [formData, setFormData] = React.useState({
     name: "",
     className: "",
-    rollNo: "",
+    parentName: "",
     parentContact: "",
     vanId: preSelectedVanId || "",
+    customFeeAmount: 0,
+    useCustomFee: false,
   });
 
   const [errors, setErrors] = React.useState({
     name: "",
     className: "",
-    rollNo: "",
+    parentName: "",
     parentContact: "",
     vanId: "",
   });
@@ -61,7 +63,7 @@ const AddStudentPage: React.FC = () => {
     const newErrors = {
       name: "",
       className: "",
-      rollNo: "",
+      parentName: "",
       parentContact: "",
       vanId: "",
     };
@@ -78,8 +80,8 @@ const AddStudentPage: React.FC = () => {
       isValid = false;
     }
 
-    if (!formData.rollNo.trim()) {
-      newErrors.rollNo = "Roll number is required";
+    if (!formData.parentName.trim()) {
+      newErrors.parentName = "Parent's name is required";
       isValid = false;
     }
 
@@ -107,7 +109,13 @@ const AddStudentPage: React.FC = () => {
       return;
     }
 
-    addStudent(formData);
+    // We'll use a default rollNo since it's being removed from the form
+    const studentData = {
+      ...formData,
+      rollNo: `AUTO-${Date.now().toString().slice(-4)}`,  // Generate an auto roll number
+    };
+
+    addStudent(studentData);
     toast.success("Student added successfully");
     
     // Navigate back to the van details page if coming from there
@@ -155,16 +163,16 @@ const AddStudentPage: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="rollNo">Roll Number</Label>
+                <Label htmlFor="parentName">Parent's Name</Label>
                 <Input
-                  id="rollNo"
-                  name="rollNo"
-                  placeholder="e.g., 101"
-                  value={formData.rollNo}
+                  id="parentName"
+                  name="parentName"
+                  placeholder="Enter parent's name"
+                  value={formData.parentName}
                   onChange={handleChange}
                 />
-                {errors.rollNo && (
-                  <p className="text-sm text-destructive">{errors.rollNo}</p>
+                {errors.parentName && (
+                  <p className="text-sm text-destructive">{errors.parentName}</p>
                 )}
               </div>
             </div>

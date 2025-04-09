@@ -5,7 +5,7 @@ import { useAppContext } from "@/context/AppContext";
 import StudentCard from "@/components/StudentCard";
 import HeaderWithBack from "@/components/HeaderWithBack";
 import { Button } from "@/components/ui/button";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Edit } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const VanDetailsPage: React.FC = () => {
@@ -26,7 +26,18 @@ const VanDetailsPage: React.FC = () => {
 
   return (
     <div className="container max-w-4xl mx-auto px-4 py-8">
-      <HeaderWithBack title={van.name} />
+      <div className="flex justify-between items-center mb-6">
+        <HeaderWithBack title={van.name} />
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => navigate(`/van/${vanId}/edit`)}
+          className="flex items-center gap-2"
+        >
+          <Edit className="h-4 w-4" />
+          <span>Edit Van</span>
+        </Button>
+      </div>
       
       <Card className="mb-6 bg-primary/5">
         <CardContent className="p-4">

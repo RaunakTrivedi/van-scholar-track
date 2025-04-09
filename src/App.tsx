@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppProvider } from "./context/AppContext";
 import HomePage from "./pages/HomePage";
 import VanDetailsPage from "./pages/VanDetailsPage";
+import VanEditPage from "./pages/VanEditPage";
 import StudentFeePage from "./pages/StudentFeePage";
 import AddStudentPage from "./pages/AddStudentPage";
 import NotFound from "./pages/NotFound";
@@ -23,6 +24,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/van/:vanId" element={<VanDetailsPage />} />
+            <Route path="/van/:vanId/edit" element={<VanEditPage />} />
             <Route path="/student/:studentId" element={<StudentFeePage />} />
             <Route path="/add-student" element={<AddStudentPage />} />
             <Route path="*" element={<NotFound />} />

@@ -7,8 +7,10 @@ export interface Student {
   name: string;
   className: string;
   rollNo: string;
+  parentName?: string;
   parentContact: string;
   vanId: string;
+  customFeeAmount?: number;
 }
 
 export interface FeeRecord {
@@ -37,6 +39,8 @@ interface AppContextType {
   getStudentById: (id: string) => Student | undefined;
   getFeeRecordsByStudent: (studentId: string) => FeeRecord[];
   updateFeeStatus: (feeId: string, status: "paid" | "unpaid", paidDate?: string) => void;
+  updateFeeAmount: (feeId: string, amount: number) => void;
+  updateVan: (vanId: string, vanData: Partial<Van>) => void;
 }
 
 // Mock data
@@ -50,18 +54,18 @@ const initialVans: Van[] = [
 ];
 
 const initialStudents: Student[] = [
-  { id: "1", name: "John Doe", className: "10A", rollNo: "101", parentContact: "9876543210", vanId: "1" },
-  { id: "2", name: "Jane Smith", className: "9B", rollNo: "102", parentContact: "9876543211", vanId: "1" },
-  { id: "3", name: "Alex Johnson", className: "11C", rollNo: "103", parentContact: "9876543212", vanId: "2" },
-  { id: "4", name: "Emily Davis", className: "8A", rollNo: "104", parentContact: "9876543213", vanId: "2" },
-  { id: "5", name: "Michael Brown", className: "12B", rollNo: "105", parentContact: "9876543214", vanId: "3" },
-  { id: "6", name: "Sarah Wilson", className: "7C", rollNo: "106", parentContact: "9876543215", vanId: "3" },
-  { id: "7", name: "David Miller", className: "10B", rollNo: "107", parentContact: "9876543216", vanId: "4" },
-  { id: "8", name: "Olivia Taylor", className: "9A", rollNo: "108", parentContact: "9876543217", vanId: "4" },
-  { id: "9", name: "James Anderson", className: "11B", rollNo: "109", parentContact: "9876543218", vanId: "5" },
-  { id: "10", name: "Sophia Thomas", className: "8C", rollNo: "110", parentContact: "9876543219", vanId: "5" },
-  { id: "11", name: "William Jackson", className: "12A", rollNo: "111", parentContact: "9876543220", vanId: "6" },
-  { id: "12", name: "Emma Harris", className: "7B", rollNo: "112", parentContact: "9876543221", vanId: "6" },
+  { id: "1", name: "John Doe", className: "10A", rollNo: "101", parentName: "Michael Doe", parentContact: "9876543210", vanId: "1" },
+  { id: "2", name: "Jane Smith", className: "9B", rollNo: "102", parentName: "Sarah Smith", parentContact: "9876543211", vanId: "1" },
+  { id: "3", name: "Alex Johnson", className: "11C", rollNo: "103", parentName: "David Johnson", parentContact: "9876543212", vanId: "2" },
+  { id: "4", name: "Emily Davis", className: "8A", rollNo: "104", parentName: "Robert Davis", parentContact: "9876543213", vanId: "2" },
+  { id: "5", name: "Michael Brown", className: "12B", rollNo: "105", parentName: "Jennifer Brown", parentContact: "9876543214", vanId: "3" },
+  { id: "6", name: "Sarah Wilson", className: "7C", rollNo: "106", parentName: "Thomas Wilson", parentContact: "9876543215", vanId: "3" },
+  { id: "7", name: "David Miller", className: "10B", rollNo: "107", parentName: "Laura Miller", parentContact: "9876543216", vanId: "4" },
+  { id: "8", name: "Olivia Taylor", className: "9A", rollNo: "108", parentName: "William Taylor", parentContact: "9876543217", vanId: "4" },
+  { id: "9", name: "James Anderson", className: "11B", rollNo: "109", parentName: "Elizabeth Anderson", parentContact: "9876543218", vanId: "5" },
+  { id: "10", name: "Sophia Thomas", className: "8C", rollNo: "110", parentName: "Richard Thomas", parentContact: "9876543219", vanId: "5" },
+  { id: "11", name: "William Jackson", className: "12A", rollNo: "111", parentName: "Mary Jackson", parentContact: "9876543220", vanId: "6" },
+  { id: "12", name: "Emma Harris", className: "7B", rollNo: "112", parentName: "George Harris", parentContact: "9876543221", vanId: "6" },
 ];
 
 // Generate fee records for the past 6 months for each student
@@ -96,7 +100,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // Provider component
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [vans] = useState<Van[]>(initialVans);
+  const [vans, setVans] = useState<Van[]>(initialVans);
   const [students, setStudents] = useState<Student[]>(initialStudents);
   const [feeRecords, setFeeRecords] = useState<FeeRecord[]>(initialFeeRecords);
 
@@ -116,7 +120,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       studentId: newStudent.id,
       month,
       year: currentYear,
-      amount: 1500,
+      amount: 1500, // Default amount, can be customized later
       status: "unpaid" as const
     }));
     
@@ -145,6 +149,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   };
 
+  const updateFeeAmount = (feeId: string, amount: number) => {
+    setFeeRecords(prevRecords => 
+      prevRecords.map(record => 
+        record.id === feeId 
+          ? { ...record, amount }
+          : record
+      )
+    );
+  };
+
+  const updateVan = (vanId: string, vanData: Partial<Van>) => {
+    setVans(prevVans => 
+      prevVans.map(van => 
+        van.id === vanId 
+          ? { ...van, ...vanData }
+          : van
+      )
+    );
+  };
+
   const value = {
     vans,
     students,
@@ -153,7 +177,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     getStudentsByVan,
     getStudentById,
     getFeeRecordsByStudent,
-    updateFeeStatus
+    updateFeeStatus,
+    updateFeeAmount,
+    updateVan
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
