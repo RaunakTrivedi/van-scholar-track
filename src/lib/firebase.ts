@@ -4,12 +4,13 @@ import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDofmDJMb_h0Y1EPl_lDwDgV_UpQnXl1H8",
-  authDomain: "school-van-manager.firebaseapp.com",
-  projectId: "school-van-manager",
-  storageBucket: "school-van-manager.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:123456789abcdef"
+  apiKey: "AIzaSyBK3cMykfGV_U0grObqlcxZH88D8rOOSaw",
+  authDomain: "van-project-b202f.firebaseapp.com",
+  projectId: "van-project-b202f",
+  storageBucket: "van-project-b202f.firebasestorage.app",
+  messagingSenderId: "862119740473",
+  appId: "1:862119740473:web:92633eef91a602f4d4b9e8",
+  measurementId: "G-4M8GSQMXM2"
 };
 
 // Initialize Firebase with retry mechanism
