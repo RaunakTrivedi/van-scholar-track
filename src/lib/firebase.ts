@@ -12,19 +12,18 @@ const firebaseConfig = {
   appId: "1:123456789012:web:123456789abcdef"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+// Initialize Firebase with retry mechanism
+let app;
+let db;
 
-// Use Firebase emulator in development if needed
-if (import.meta.env.DEV) {
-  try {
-    // Uncomment the following line to use the emulator
-    // connectFirestoreEmulator(db, 'localhost', 8080);
-    console.log("Firebase initialized successfully");
-  } catch (error) {
-    console.error("Error connecting to Firebase:", error);
-  }
+try {
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  console.log("Firebase initialized successfully");
+} catch (error) {
+  console.error("Error initializing Firebase:", error);
+  throw new Error("Failed to initialize Firebase");
 }
 
+export { db };
 export default app;

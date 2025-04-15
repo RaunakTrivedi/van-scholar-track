@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { toast } from "sonner";
 import {
@@ -127,6 +126,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [feeRecords, setFeeRecords] = useState<FeeRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [initAttempted, setInitAttempted] = useState<boolean>(false);
+  const [usingLocalData, setUsingLocalData] = useState<boolean>(false);
 
   // Initialize data from Firebase
   useEffect(() => {
@@ -143,9 +143,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             setStudents(initialStudents);
             setFeeRecords(initialFeeRecords);
             setLoading(false);
+            setUsingLocalData(true);
             toast.error("Could not connect to Firebase. Using sample data instead.");
           }
-        }, 15000); // 15 second timeout
+        }, 10000); // 10 second timeout
         
         // First, try to initialize with sample data if DB is empty
         await initializeFirebaseData(initialVans, initialStudents, initialFeeRecords);
@@ -164,6 +165,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const feeRecordsData = await fetchFeeRecords();
         console.log("Fetched fee records:", feeRecordsData.length);
         
+        if (vansData.length === 0 && studentsData.length === 0 && feeRecordsData.length === 0) {
+          throw new Error("No data retrieved from Firebase");
+        }
+        
         setVans(vansData);
         setStudents(studentsData);
         setFeeRecords(feeRecordsData);
@@ -178,6 +183,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setVans(initialVans);
         setStudents(initialStudents);
         setFeeRecords(initialFeeRecords);
+        setUsingLocalData(true);
       } finally {
         setLoading(false);
       }
@@ -185,6 +191,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     loadData();
   }, []);
+
+  // Helper function to check if we have connectivity issues
+  const handleFirebaseOperation = async <T,>(
+    operation: () => Promise<T>,
+    errorMessage: string,
+    fallbackValue?: T
+  ): Promise<T> => {
+    if (usingLocalData) {
+      console.warn("Operating in offline mode. Changes won't be synced to Firebase.");
+      // If we're using local data, just do the operation without Firebase
+      return operation();
+    }
+
+    try {
+      return await operation();
+    } catch (error) {
+      console.error(errorMessage, error);
+      toast.error(errorMessage);
+      
+      if (fallbackValue !== undefined) {
+        return fallbackValue;
+      }
+      throw error;
+    }
+  };
 
   const addStudent = async (studentData: Omit<Student, "id">) => {
     try {
