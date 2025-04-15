@@ -1,4 +1,5 @@
 
+import React, { useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,7 +13,6 @@ import StudentFeePage from "./pages/StudentFeePage";
 import AddStudentPage from "./pages/AddStudentPage";
 import NotFound from "./pages/NotFound";
 import LoadingPage from "./pages/LoadingPage";
-import { useState } from "react";
 
 const queryClient = new QueryClient();
 
