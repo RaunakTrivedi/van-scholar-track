@@ -1,9 +1,8 @@
 
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyDofmDJMb_h0Y1EPl_lDwDgV_UpQnXl1H8",
   authDomain: "school-van-manager.firebaseapp.com",
@@ -16,5 +15,16 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+
+// Use Firebase emulator in development if needed
+if (import.meta.env.DEV) {
+  try {
+    // Uncomment the following line to use the emulator
+    // connectFirestoreEmulator(db, 'localhost', 8080);
+    console.log("Firebase initialized successfully");
+  } catch (error) {
+    console.error("Error connecting to Firebase:", error);
+  }
+}
 
 export default app;
