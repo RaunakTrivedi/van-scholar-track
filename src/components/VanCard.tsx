@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Bus, Trash2 } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface VanCardProps {
   van: Van;
@@ -14,8 +15,24 @@ interface VanCardProps {
 
 const VanCard: React.FC<VanCardProps> = ({ van, onDeleteClick }) => {
   const navigate = useNavigate();
-  const { getStudentsByVan } = useAppContext();
+  const { getStudentsByVan, loading } = useAppContext();
   const students = getStudentsByVan(van.id);
+
+  if (loading) {
+    return (
+      <Card className="overflow-hidden bg-gradient-to-br from-blue-50 to-white">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <Skeleton className="h-12 w-12 rounded-full" />
+            <Skeleton className="h-6 w-24 rounded-full" />
+          </div>
+          <Skeleton className="h-6 w-3/4 mb-2" />
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="h-4 w-1/3 mt-2" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card 

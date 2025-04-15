@@ -1,5 +1,19 @@
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { toast } from "sonner";
+import {
+  fetchVans, 
+  fetchStudents, 
+  fetchFeeRecords,
+  addVanToFirebase,
+  updateVanInFirebase,
+  deleteVanFromFirebase,
+  addStudentToFirebase,
+  updateStudentInFirebase,
+  addFeeRecordToFirebase,
+  updateFeeRecordInFirebase,
+  initializeFirebaseData
+} from "@/services/firebase.service";
 
 // Types
 export interface Student {
@@ -28,26 +42,27 @@ export interface Van {
   name: string;
   capacity: number;
   route: string;
-  defaultFee?: number; // New field for default fee
+  defaultFee?: number;
 }
 
 interface AppContextType {
   vans: Van[];
   students: Student[];
   feeRecords: FeeRecord[];
-  addStudent: (student: Omit<Student, "id">) => void;
+  loading: boolean;
+  addStudent: (student: Omit<Student, "id">) => Promise<void>;
   getStudentsByVan: (vanId: string) => Student[];
   getStudentById: (id: string) => Student | undefined;
   getFeeRecordsByStudent: (studentId: string) => FeeRecord[];
-  updateFeeStatus: (feeId: string, status: "paid" | "unpaid", paidDate?: string) => void;
-  updateFeeAmount: (feeId: string, amount: number) => void;
-  updateVan: (vanId: string, vanData: Partial<Van>) => void;
-  addVan: (vanData: Omit<Van, "id">) => void; // New function to add van
-  removeVan: (vanId: string) => void; // New function to remove van
-  updateVanFeeForAllStudents: (vanId: string, feeAmount: number) => void; // New function
+  updateFeeStatus: (feeId: string, status: "paid" | "unpaid", paidDate?: string) => Promise<void>;
+  updateFeeAmount: (feeId: string, amount: number) => Promise<void>;
+  updateVan: (vanId: string, vanData: Partial<Van>) => Promise<void>;
+  addVan: (vanData: Omit<Van, "id">) => Promise<void>;
+  removeVan: (vanId: string) => Promise<void>;
+  updateVanFeeForAllStudents: (vanId: string, feeAmount: number) => Promise<void>;
 }
 
-// Mock data
+// Mock data for initial seeding
 const initialVans: Van[] = [
   { id: "1", name: "Van A", capacity: 15, route: "North Route", defaultFee: 1500 },
   { id: "2", name: "Van B", capacity: 12, route: "South Route", defaultFee: 1500 },
@@ -107,34 +122,70 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // Provider component
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [vans, setVans] = useState<Van[]>(initialVans);
-  const [students, setStudents] = useState<Student[]>(initialStudents);
-  const [feeRecords, setFeeRecords] = useState<FeeRecord[]>(initialFeeRecords);
+  const [vans, setVans] = useState<Van[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [feeRecords, setFeeRecords] = useState<FeeRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const addStudent = (studentData: Omit<Student, "id">) => {
-    const newStudent: Student = {
-      ...studentData,
-      id: `${students.length + 1}`,
+  // Initialize data from Firebase
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        
+        // First, try to initialize with sample data if DB is empty
+        await initializeFirebaseData(initialVans, initialStudents, initialFeeRecords);
+        
+        // Then fetch all data
+        const vansData = await fetchVans();
+        const studentsData = await fetchStudents();
+        const feeRecordsData = await fetchFeeRecords();
+        
+        setVans(vansData);
+        setStudents(studentsData);
+        setFeeRecords(feeRecordsData);
+      } catch (error) {
+        console.error("Error loading data from Firebase:", error);
+        toast.error("Failed to load data from the server");
+      } finally {
+        setLoading(false);
+      }
     };
-    setStudents([...students, newStudent]);
     
-    // Create fee records for the new student
-    const months = ["January", "February", "March", "April", "May", "June"];
-    const currentYear = new Date().getFullYear();
-    
-    const van = vans.find(v => v.id === studentData.vanId);
-    const feeAmount = studentData.customFeeAmount || van?.defaultFee || 1500;
-    
-    const newFeeRecords = months.map((month, index) => ({
-      id: `${newStudent.id}-${month}`,
-      studentId: newStudent.id,
-      month,
-      year: currentYear,
-      amount: feeAmount,
-      status: "unpaid" as const
-    }));
-    
-    setFeeRecords([...feeRecords, ...newFeeRecords]);
+    loadData();
+  }, []);
+
+  const addStudent = async (studentData: Omit<Student, "id">) => {
+    try {
+      const newStudent = await addStudentToFirebase(studentData);
+      setStudents(prev => [...prev, newStudent]);
+      
+      // Create fee records for the new student
+      const months = ["January", "February", "March", "April", "May", "June"];
+      const currentYear = new Date().getFullYear();
+      
+      const van = vans.find(v => v.id === studentData.vanId);
+      const feeAmount = studentData.customFeeAmount || van?.defaultFee || 1500;
+      
+      const newFeeRecordsPromises = months.map((month) => {
+        const newFeeRecord = {
+          studentId: newStudent.id,
+          month,
+          year: currentYear,
+          amount: feeAmount,
+          status: "unpaid" as const
+        };
+        return addFeeRecordToFirebase(newFeeRecord);
+      });
+      
+      const newFeeRecords = await Promise.all(newFeeRecordsPromises);
+      setFeeRecords(prev => [...prev, ...newFeeRecords]);
+      
+      toast.success("Student added successfully");
+    } catch (error) {
+      console.error("Error adding student:", error);
+      toast.error("Failed to add student");
+    }
   };
 
   const getStudentsByVan = (vanId: string) => {
@@ -149,47 +200,71 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return feeRecords.filter(record => record.studentId === studentId);
   };
 
-  const updateFeeStatus = (feeId: string, status: "paid" | "unpaid", paidDate?: string) => {
-    setFeeRecords(prevRecords => 
-      prevRecords.map(record => 
-        record.id === feeId 
-          ? { ...record, status, paidDate }
-          : record
-      )
-    );
+  const updateFeeStatus = async (feeId: string, status: "paid" | "unpaid", paidDate?: string) => {
+    try {
+      await updateFeeRecordInFirebase(feeId, { status, paidDate });
+      
+      setFeeRecords(prevRecords => 
+        prevRecords.map(record => 
+          record.id === feeId 
+            ? { ...record, status, paidDate }
+            : record
+        )
+      );
+    } catch (error) {
+      console.error("Error updating fee status:", error);
+      toast.error("Failed to update fee status");
+    }
   };
 
-  const updateFeeAmount = (feeId: string, amount: number) => {
-    setFeeRecords(prevRecords => 
-      prevRecords.map(record => 
-        record.id === feeId 
-          ? { ...record, amount }
-          : record
-      )
-    );
+  const updateFeeAmount = async (feeId: string, amount: number) => {
+    try {
+      await updateFeeRecordInFirebase(feeId, { amount });
+      
+      setFeeRecords(prevRecords => 
+        prevRecords.map(record => 
+          record.id === feeId 
+            ? { ...record, amount }
+            : record
+        )
+      );
+    } catch (error) {
+      console.error("Error updating fee amount:", error);
+      toast.error("Failed to update fee amount");
+    }
   };
 
-  const updateVan = (vanId: string, vanData: Partial<Van>) => {
-    setVans(prevVans => 
-      prevVans.map(van => 
-        van.id === vanId 
-          ? { ...van, ...vanData }
-          : van
-      )
-    );
+  const updateVan = async (vanId: string, vanData: Partial<Van>) => {
+    try {
+      await updateVanInFirebase(vanId, vanData);
+      
+      setVans(prevVans => 
+        prevVans.map(van => 
+          van.id === vanId 
+            ? { ...van, ...vanData }
+            : van
+        )
+      );
+      
+      toast.success("Van updated successfully");
+    } catch (error) {
+      console.error("Error updating van:", error);
+      toast.error("Failed to update van");
+    }
   };
   
-  // New function to add a van
-  const addVan = (vanData: Omit<Van, "id">) => {
-    const newVan: Van = {
-      ...vanData,
-      id: `${vans.length + 1}`,
-    };
-    setVans([...vans, newVan]);
+  const addVan = async (vanData: Omit<Van, "id">) => {
+    try {
+      const newVan = await addVanToFirebase(vanData);
+      setVans([...vans, newVan]);
+      toast.success("New van added successfully");
+    } catch (error) {
+      console.error("Error adding van:", error);
+      toast.error("Failed to add new van");
+    }
   };
   
-  // New function to remove a van
-  const removeVan = (vanId: string) => {
+  const removeVan = async (vanId: string) => {
     // First check if there are students assigned to this van
     const studentsInVan = students.filter(student => student.vanId === vanId);
     
@@ -197,42 +272,58 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       throw new Error("Cannot remove a van with assigned students");
     }
     
-    setVans(prevVans => prevVans.filter(van => van.id !== vanId));
+    try {
+      await deleteVanFromFirebase(vanId);
+      setVans(prevVans => prevVans.filter(van => van.id !== vanId));
+      toast.success("Van removed successfully");
+    } catch (error) {
+      console.error("Error removing van:", error);
+      toast.error("Failed to remove van");
+    }
   };
   
-  // New function to update fee for all students in a van
-  const updateVanFeeForAllStudents = (vanId: string, feeAmount: number) => {
-    const studentsInVan = getStudentsByVan(vanId);
-    const currentDate = new Date();
-    const currentMonthName = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ][currentDate.getMonth()];
-    const currentYear = currentDate.getFullYear();
-    
-    // Update the default fee for the van
-    updateVan(vanId, { defaultFee: feeAmount });
-    
-    // Update current month's fee records for all students in the van who don't have custom fee
-    setFeeRecords(prevRecords => 
-      prevRecords.map(record => {
+  const updateVanFeeForAllStudents = async (vanId: string, feeAmount: number) => {
+    try {
+      // Update the default fee for the van
+      await updateVan(vanId, { defaultFee: feeAmount });
+      
+      const studentsInVan = getStudentsByVan(vanId);
+      const currentDate = new Date();
+      const currentMonthName = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ][currentDate.getMonth()];
+      const currentYear = currentDate.getFullYear();
+      
+      // Update current month's fee records for all students in the van who don't have custom fee
+      const updatedRecords = feeRecords.map(async (record) => {
         const student = studentsInVan.find(s => s.id === record.studentId);
         // Only update if student is in this van, it's current month, and student has no custom fee
         if (student && 
             !student.customFeeAmount && 
             record.month === currentMonthName && 
             record.year === currentYear) {
+          await updateFeeRecordInFirebase(record.id, { amount: feeAmount });
           return { ...record, amount: feeAmount };
         }
         return record;
-      })
-    );
+      });
+      
+      const resolvedRecords = await Promise.all(updatedRecords);
+      setFeeRecords(resolvedRecords);
+      
+      toast.success("Van fee updated for all students");
+    } catch (error) {
+      console.error("Error updating van fee for students:", error);
+      toast.error("Failed to update van fee for students");
+    }
   };
 
   const value = {
     vans,
     students,
     feeRecords,
+    loading,
     addStudent,
     getStudentsByVan,
     getStudentById,
