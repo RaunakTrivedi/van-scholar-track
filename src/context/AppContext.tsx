@@ -13,6 +13,7 @@ import {
   updateFeeRecordInFirebase,
   initializeFirebaseData
 } from "@/services/firebase.service";
+import { retryFirebaseInitialization } from "@/lib/firebase";
 
 // Types
 export interface Student {
@@ -49,6 +50,8 @@ interface AppContextType {
   students: Student[];
   feeRecords: FeeRecord[];
   loading: boolean;
+  error: string | null;
+  retryLoading: () => Promise<void>;
   addStudent: (student: Omit<Student, "id">) => Promise<void>;
   getStudentsByVan: (vanId: string) => Student[];
   getStudentById: (id: string) => Student | undefined;
@@ -125,72 +128,90 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [students, setStudents] = useState<Student[]>([]);
   const [feeRecords, setFeeRecords] = useState<FeeRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [initAttempted, setInitAttempted] = useState<boolean>(false);
   const [usingLocalData, setUsingLocalData] = useState<boolean>(false);
 
-  // Initialize data from Firebase
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        console.log("Starting data loading from Firebase...");
-        setLoading(true);
-        
-        // Add a timeout to prevent infinite loading
-        const timeoutId = setTimeout(() => {
-          if (!initAttempted) {
-            console.log("Loading timeout - fallback to sample data");
-            setVans(initialVans);
-            setStudents(initialStudents);
-            setFeeRecords(initialFeeRecords);
-            setLoading(false);
-            setUsingLocalData(true);
-            toast.error("Could not connect to Firebase. Using sample data instead.");
-          }
-        }, 10000); // 10 second timeout
-        
-        // First, try to initialize with sample data if DB is empty
-        await initializeFirebaseData(initialVans, initialStudents, initialFeeRecords);
-        setInitAttempted(true);
-        
-        // Then fetch all data
-        console.log("Fetching vans...");
-        const vansData = await fetchVans();
-        console.log("Fetched vans:", vansData.length);
-        
-        console.log("Fetching students...");
-        const studentsData = await fetchStudents();
-        console.log("Fetched students:", studentsData.length);
-        
-        console.log("Fetching fee records...");
-        const feeRecordsData = await fetchFeeRecords();
-        console.log("Fetched fee records:", feeRecordsData.length);
-        
-        if (vansData.length === 0 && studentsData.length === 0 && feeRecordsData.length === 0) {
-          throw new Error("No data retrieved from Firebase");
-        }
-        
-        setVans(vansData);
-        setStudents(studentsData);
-        setFeeRecords(feeRecordsData);
-        
-        clearTimeout(timeoutId);
-        console.log("Data loading complete");
-      } catch (error) {
-        console.error("Error loading data from Firebase:", error);
+  // Function to load data from Firebase
+  const loadData = async () => {
+    try {
+      setError(null);
+      setLoading(true);
+      console.log("Starting data loading from Firebase...");
+      
+      // First, try to initialize with sample data if DB is empty
+      await initializeFirebaseData(initialVans, initialStudents, initialFeeRecords);
+      setInitAttempted(true);
+      
+      // Then fetch all data
+      console.log("Fetching vans...");
+      const vansData = await fetchVans();
+      console.log("Fetched vans:", vansData.length);
+      
+      console.log("Fetching students...");
+      const studentsData = await fetchStudents();
+      console.log("Fetched students:", studentsData.length);
+      
+      console.log("Fetching fee records...");
+      const feeRecordsData = await fetchFeeRecords();
+      console.log("Fetched fee records:", feeRecordsData.length);
+      
+      if (vansData.length === 0 && studentsData.length === 0 && feeRecordsData.length === 0) {
+        throw new Error("No data retrieved from Firebase");
+      }
+      
+      setVans(vansData);
+      setStudents(studentsData);
+      setFeeRecords(feeRecordsData);
+      setUsingLocalData(false);
+      
+      console.log("Data loading complete");
+    } catch (error) {
+      console.error("Error loading data from Firebase:", error);
+      setError("Failed to connect to the database. Check your connection and try again.");
+      
+      // Fallback to sample data on error if we haven't already
+      if (!usingLocalData) {
         toast.error("Failed to load data from the server. Using sample data instead.");
-        
-        // Fallback to sample data on error
         setVans(initialVans);
         setStudents(initialStudents);
         setFeeRecords(initialFeeRecords);
         setUsingLocalData(true);
-      } finally {
-        setLoading(false);
       }
-    };
-    
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initialize data from Firebase
+  useEffect(() => {
     loadData();
   }, []);
+
+  // Function to retry loading data
+  const retryLoading = async () => {
+    try {
+      // First try to reinitialize Firebase
+      await retryFirebaseInitialization();
+      
+      // Then reload the data
+      await loadData();
+      
+      toast.success("Successfully reconnected to the database");
+    } catch (error) {
+      console.error("Error retrying data load:", error);
+      setError("Failed to reconnect to the database. Using sample data for now.");
+      
+      if (!usingLocalData) {
+        setVans(initialVans);
+        setStudents(initialStudents);
+        setFeeRecords(initialFeeRecords);
+        setUsingLocalData(true);
+      }
+      
+      toast.error("Failed to reconnect to the database. Using sample data instead.");
+    }
+  };
 
   // Helper function to check if we have connectivity issues
   const handleFirebaseOperation = async <T,>(
@@ -386,6 +407,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     students,
     feeRecords,
     loading,
+    error,
+    retryLoading,
     addStudent,
     getStudentsByVan,
     getStudentById,
